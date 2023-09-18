@@ -1,0 +1,15 @@
+[package]
+name = "tracectrl"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+axum = "0.6.20"
+ctrlc = "3.4.1"
+tokio = { version = "1.32.0", features = ["full"] }
+tower = "0.4.13"
+tower-http = { version = "0.4.4", features = ["fs"] }
+tracing = { version = "0.1.37", features = ["max_level_trace"] }
+tracing-subscriber = "0.3.17"
