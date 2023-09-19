@@ -1,17 +1,16 @@
-import './App.css'
-import { ModeToggle } from './components/mode-toggle'
+import "./App.css";
 
-import { ThemeProvider } from './components/theme-provider'
+import { HeaderBar } from "@/components/header-bar";
+import { ThemeProvider } from "@/components/theme-provider";
 
 function App() {
-
   return (
-    <ThemeProvider defaultTheme='dark' storageKey='vite-ui-theme'>
-      <div className='p-4'>
-        <ModeToggle />
-      </div>
+    <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
+      <>
+        <HeaderBar />
+      </>
     </ThemeProvider>
-  )
+  );
 }
 
-export default App
+export default App;
