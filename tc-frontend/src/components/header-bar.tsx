@@ -1,18 +1,18 @@
-import { cn } from "@/lib/utils";
-import { ModeToggle } from "./mode-toggle";
+import { HeaderBarMenu } from "@/components/header-bar/menu";
+import { ModeToggle } from "@/components/mode-toggle";
+import { Button } from "@/components/ui/button";
 import {
   Command,
-  CommandInput,
-  CommandItem,
-  CommandList,
   CommandDialog,
-  CommandGroup,
   CommandEmpty,
-} from "./ui/command";
-import { useEffect, useState } from "react";
-import { Button } from "./ui/button";
+  CommandGroup,
+  CommandInput,
+  CommandList,
+} from "@/components/ui/command";
+import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
 import { Cross1Icon } from "@radix-ui/react-icons";
-import { Separator } from "./ui/separator";
+import { useEffect, useState } from "react";
 
 export function HeaderBar() {
   const [open, setOpen] = useState(false);
@@ -33,14 +33,16 @@ export function HeaderBar() {
     <>
       <div
         className={cn(
-          "p-4",
-          "mx-auto",
           "flex",
           "gap-1",
+          "lg:max-w-4xl",
           "md:max-w-2xl",
-          "lg:max-w-4xl"
+          "mx-auto",
+          "p-4"
         )}
       >
+        <HeaderBarMenu />
+
         <Command onValueChange={() => setOpen(true)}>
           <CommandInput
             value={search}
@@ -53,7 +55,7 @@ export function HeaderBar() {
           ></CommandInput>
         </Command>
         <Button variant="outline" onClick={() => setSearch("")}>
-          <Cross1Icon className={cn("h-4", "w-4", "mr-2")} />
+          <Cross1Icon className={cn("h-4", "mr-2", "w-4")} />
           Clear
         </Button>
 
