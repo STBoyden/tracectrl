@@ -8,6 +8,15 @@ export default defineConfig({
   server: {
     port: 8080,
     strictPort: true,
+    proxy: {
+      "/ws": {
+        ws: true,
+        target: "base",
+        rewrite(path) {
+          return path.replace(/^\/ws/, "");
+        },
+      },
+    },
   },
   resolve: {
     alias: {
