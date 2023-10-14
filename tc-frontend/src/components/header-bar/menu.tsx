@@ -36,6 +36,11 @@ export function HeaderBarMenu() {
   async function onFormSubmit(values: z.infer<typeof settingsFormSchema>) {
     toast({
       title: "Saved changes",
+      description: (
+        <>
+          Host changed to <code>{values.host}</code>
+        </>
+      ),
     });
   }
 

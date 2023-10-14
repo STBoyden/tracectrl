@@ -1,5 +1,7 @@
 mod router;
+mod url;
 
+use crate::router::get_router;
 use std::{
     net::SocketAddr,
     process::{exit, Child, Command, Stdio},
@@ -7,14 +9,15 @@ use std::{
 };
 
 use axum::{
-    body::{boxed, Body, BoxBody},
-    http::{Request, Response, StatusCode, Uri},
-    response::Redirect,
+    body::{boxed, Body},
+    http::{HeaderMap, Request, StatusCode, Uri},
+    response::Response,
     routing::get,
     Router,
 };
 use tower::ServiceExt;
 use tower_http::services::ServeDir;
+use url::UrlType;
 
 #[cfg(debug_assertions)]
 fn initialise() -> Child {
@@ -33,7 +36,45 @@ fn initialise() -> Child {
     unreachable!()
 }
 
-async fn get_static_file(uri: Uri) -> Result<Response<BoxBody>, (StatusCode, String)> {
+#[axum_macros::debug_handler]
+async fn forward_requests(request: Request<Body>) -> Result<Response, (StatusCode, String)> {
+    let client = reqwest::Client::new();
+
+    let uri = UrlType::Axum(request.uri().clone())
+        .to_reqwest()
+        .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))?;
+
+    let forward = reqwest::Request::new(request.method().to_owned(), uri);
+
+    let res = client
+        .execute(forward)
+        .await
+        .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))?;
+
+    let status = res.status();
+    let headers = res.headers().clone();
+    let body = boxed(
+        res.text()
+            .await
+            .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))?,
+    );
+
+    let mut response = Response::builder().status(status);
+
+    if response.headers_ref().is_none() {
+        *response.headers_mut().unwrap() = HeaderMap::new();
+    }
+    for (key, value) in headers.iter() {
+        response.headers_mut().unwrap().append(key, value.clone());
+    }
+
+    response
+        .body(body)
+        .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))
+}
+
+#[axum_macros::debug_handler]
+async fn get_static_file(uri: Uri) -> Result<Response, (StatusCode, String)> {
     let req = Request::builder().uri(uri).body(Body::empty()).unwrap();
 
     match ServeDir::new(format!("{}/dist", env!("TC_FRONTEND_DIR")))
@@ -48,7 +89,8 @@ async fn get_static_file(uri: Uri) -> Result<Response<BoxBody>, (StatusCode, Str
     }
 }
 
-pub async fn file_handler(uri: Uri) -> Result<Response<BoxBody>, (StatusCode, String)> {
+#[axum_macros::debug_handler]
+pub async fn file_handler(uri: Uri) -> Result<Response, (StatusCode, String)> {
     let res = get_static_file(uri.clone()).await?;
 
     if res.status() == StatusCode::NOT_FOUND {
@@ -66,13 +108,12 @@ async fn main() {
     tracing_subscriber::fmt::init();
 
     let app = if cfg!(debug_assertions) {
-        Router::new().fallback(get(|| async { Redirect::to("localhost:8080") }))
+        Router::new().fallback(get(forward_requests))
     } else {
         Router::new().fallback(get(file_handler))
     };
 
-    let router = Router::new();
-
+    let router = Router::new().nest("/api", get_router());
     let app = app.merge(router);
 
     if cfg!(debug_assertions) {
@@ -100,7 +141,7 @@ async fn main() {
         .expect("could not set CTRL+C handler");
 
         tracing::debug!("Front-end process id: {frontend_pid}");
-        tracing::debug!("Front-end web server listening on 'http://localhost:8080'")
+        tracing::debug!("Front-end web server listening on 'http://localhost:8080'");
     }
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
