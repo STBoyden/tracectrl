@@ -20,13 +20,18 @@ import {
 import { useToast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { HamburgerMenuIcon } from "@radix-ui/react-icons";
+import { GearIcon } from "@radix-ui/react-icons";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import { _defaultSettings, settingsFormSchema } from "../settings-provider";
+import {
+  _defaultSettings,
+  settingsFormSchema,
+  useSettings,
+} from "../settings-provider";
 
 export function HeaderBarMenu() {
   const { toast } = useToast();
+  const { settings, setSettings } = useSettings();
 
   const settingsForm = useForm<z.infer<typeof settingsFormSchema>>({
     resolver: zodResolver(settingsFormSchema),
@@ -34,6 +39,8 @@ export function HeaderBarMenu() {
   });
 
   async function onFormSubmit(values: z.infer<typeof settingsFormSchema>) {
+    setSettings(values);
+
     toast({
       title: "Saved changes",
       description: (
@@ -48,7 +55,7 @@ export function HeaderBarMenu() {
     <Sheet>
       <SheetTrigger asChild>
         <Button variant="outline">
-          <HamburgerMenuIcon className={cn("h-4", "mr-2", "w-4")} /> Menu
+          <GearIcon className={cn("h-4", "mr-2", "w-4")} /> Settings
         </Button>
       </SheetTrigger>
       <SheetContent side="left">
@@ -70,7 +77,7 @@ export function HeaderBarMenu() {
                 <FormItem>
                   <FormLabel>Host</FormLabel>
                   <FormControl>
-                    <Input placeholder={_defaultSettings.host!} {...field} />
+                    <Input placeholder={settings.host!} {...field} />
                   </FormControl>
                   <FormDescription>
                     The host from where to receive the logs from. By default, it

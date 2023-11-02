@@ -51,7 +51,7 @@ export function HeaderBar() {
               setOpen(true);
             }}
             disabled={open && search != ""}
-            placeholder="[Cmd+K/Ctrl+K] Type a command or search..."
+            placeholder="[⌘+K/Ctrl+K] Type a command or search..."
           ></CommandInput>
         </Command>
         <Button variant="outline" onClick={() => setSearch("")}>

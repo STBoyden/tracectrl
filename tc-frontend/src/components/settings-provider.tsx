@@ -48,8 +48,9 @@ export function SettingsProvider({
 }: SettingsProviderProps) {
   const [settings, setSettings] = useState<Settings>(
     () =>
-      (JSON.parse(localStorage.getItem(settingsKey) ?? "") as Settings) ||
-      defaultSettings
+      (JSON.parse(
+        localStorage.getItem(settingsKey) ?? JSON.stringify("")
+      ) as Settings) || defaultSettings
   );
 
   const value = {
