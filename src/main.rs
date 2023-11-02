@@ -72,7 +72,10 @@ async fn forward_requests(request: Request<Body>) -> Result<Response> {
 
 #[axum_macros::debug_handler]
 async fn get_static_file(uri: Uri) -> Result<Response> {
-	let req = Request::builder().uri(uri).body(Body::empty()).unwrap();
+	let req = Request::builder()
+		.uri(uri)
+		.body(Body::empty())
+		.map_err(Error::from)?;
 
 	match ServeDir::new(fmt!("{}/dist", env!("TC_FRONTEND_DIR")))
 		.oneshot(req)
@@ -91,7 +94,7 @@ pub async fn file_handler(uri: Uri) -> Result<Response> {
 	let res = get_static_file(uri.clone()).await?;
 
 	if res.status() == StatusCode::NOT_FOUND {
-		match fmt!("{}.html", uri).parse() {
+		match fmt!("{uri}.html").parse() {
 			Ok(uri_html) => get_static_file(uri_html).await,
 			Err(_) => Err(Error::ResponseError(
 				StatusCode::INTERNAL_SERVER_ERROR,
