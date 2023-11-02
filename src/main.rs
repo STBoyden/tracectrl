@@ -10,9 +10,11 @@ use crate::{
 	utils::{peer_map::PeerMap, W},
 };
 
+#[cfg(debug_assertions)]
+use std::process::{Command, Stdio};
 use std::{
 	net::SocketAddr,
-	process::{exit, Child, Command, Stdio},
+	process::{exit, Child},
 	sync::Arc,
 };
 
@@ -118,6 +120,7 @@ pub async fn file_handler(uri: Uri) -> Result<Response> {
 //   else that may be sent through the pipe via websockets.
 #[tokio::main]
 async fn main() {
+	dotenv::dotenv().ok();
 	tracing_subscriber::fmt::init();
 
 	let app = if cfg!(debug_assertions) {
