@@ -9,3 +9,5 @@ max_width = 90
 reorder_impl_items = true
 reorder_imports = true
 reorder_modules = true
+normalize_comments = true
+normalize_doc_attributes = true
