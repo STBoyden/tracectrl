@@ -7,7 +7,7 @@ mod ws;
 use crate::{
 	prelude::*,
 	router::get_router,
-	utils::{peer_map::PeerMap, W},
+	utils::{arctex::ArcTex, peer_map::PeerMap, W},
 };
 
 #[cfg(debug_assertions)]
@@ -15,7 +15,6 @@ use std::process::{Command, Stdio};
 use std::{
 	net::SocketAddr,
 	process::{exit, Child},
-	sync::Arc,
 };
 
 use axum::{
@@ -25,7 +24,6 @@ use axum::{
 	routing::get,
 	Router,
 };
-use parking_lot::Mutex;
 use tokio::net::TcpListener;
 use tower::ServiceExt;
 use tower_http::services::ServeDir;
@@ -144,7 +142,7 @@ async fn main() {
 		// we need to get a lock on the vite process, so we can safefully shut it down
 		// after this server has been closed - we don't want random zombie processes
 		// that cannot be stopped.
-		let frontend = Arc::new(Mutex::new(initialise()));
+		let frontend = ArcTex::new(initialise());
 		let frontend_pid = frontend.lock().id(); // we get the pid so that the vite server can be manually killed if need be
 
 		let frontend_clone = frontend.clone();

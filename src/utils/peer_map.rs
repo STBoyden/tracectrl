@@ -1,19 +1,20 @@
-use std::{net::SocketAddr, ops::Deref, sync::Arc};
+use std::{net::SocketAddr, ops::Deref};
+
+use crate::utils::arctex::ArcTex;
 
 use dashmap::DashMap;
 use futures_channel::mpsc::UnboundedSender;
-use parking_lot::Mutex;
 use tokio_tungstenite::tungstenite::protocol::Message;
 
-pub type Tx = UnboundedSender<Message>;
-type PeerMapInner = Arc<Mutex<DashMap<SocketAddr, Tx>>>;
+type Tx = UnboundedSender<Message>;
+type PeerMapInner = ArcTex<DashMap<SocketAddr, Tx>>;
 
 #[derive(Clone, Debug)]
 pub struct PeerMap(PeerMapInner);
 
 impl PeerMap {
 	pub fn new() -> Self {
-		Self(Arc::new(Mutex::new(DashMap::new())))
+		Self(ArcTex::new(DashMap::new()))
 	}
 }
 unsafe impl Send for PeerMap {}
