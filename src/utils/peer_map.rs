@@ -17,7 +17,7 @@ impl PeerMap {
 		Self(ArcTex::new(DashMap::new()))
 	}
 }
-unsafe impl Send for PeerMap {}
+
 impl Deref for PeerMap {
 	type Target = PeerMapInner;
 
