@@ -1,0 +1,5 @@
+[*.rs, *.{ts,tsx,js,jsx}]
+tab_width = 2
+charset = utf-8
+indent_size = 2
+indent_style = tab

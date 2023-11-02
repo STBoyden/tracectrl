@@ -1,154 +1,184 @@
+mod error;
+mod prelude;
 mod router;
-mod url;
+mod utils;
+mod ws;
 
-use crate::router::get_router;
+use crate::{
+	prelude::*,
+	router::get_router,
+	utils::{peer_map::PeerMap, W},
+};
+
 use std::{
-    net::SocketAddr,
-    process::{exit, Child, Command, Stdio},
-    sync::{Arc, Mutex},
+	net::SocketAddr,
+	process::{exit, Child, Command, Stdio},
+	sync::Arc,
 };
 
 use axum::{
-    body::{boxed, Body},
-    http::{HeaderMap, Request, StatusCode, Uri},
-    response::Response,
-    routing::get,
-    Router,
+	body::{boxed, Body},
+	http::{HeaderMap, Request, StatusCode, Uri},
+	response::Response,
+	routing::get,
+	Router,
 };
+use parking_lot::Mutex;
+use tokio::net::TcpListener;
 use tower::ServiceExt;
 use tower_http::services::ServeDir;
-use url::UrlType;
 
 #[cfg(debug_assertions)]
 fn initialise() -> Child {
-    Command::new(env!("TC_PACKAGE_MANAGER"))
-        .args(["run", "dev"])
-        .current_dir(env!("TC_FRONTEND_DIR"))
-        .stdout(Stdio::null())
-        .stdin(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-        .expect("could not start package manager")
+	Command::new(env!("TC_PACKAGE_MANAGER"))
+		.args(["run", "dev"])
+		.current_dir(env!("TC_FRONTEND_DIR"))
+		.stdout(Stdio::null())
+		.stdin(Stdio::null())
+		.stderr(Stdio::null())
+		.spawn()
+		.expect("could not start package manager")
 }
 
 #[cfg(not(debug_assertions))]
 fn initialise() -> Child {
-    unreachable!()
+	unreachable!()
 }
 
 #[axum_macros::debug_handler]
-async fn forward_requests(request: Request<Body>) -> Result<Response, (StatusCode, String)> {
-    let client = reqwest::Client::new();
+async fn forward_requests(request: Request<Body>) -> Result<Response> {
+	let client = reqwest::Client::new();
 
-    let uri = UrlType::Axum(request.uri().clone())
-        .to_reqwest()
-        .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))?;
+	let uri: reqwest::Url = W(request.uri()).try_into()?;
+	let forward = reqwest::Request::new(request.method().to_owned(), uri);
 
-    let forward = reqwest::Request::new(request.method().to_owned(), uri);
+	let res = client.execute(forward).await?;
 
-    let res = client
-        .execute(forward)
-        .await
-        .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))?;
+	let status = res.status();
+	let headers = res.headers().clone();
+	let body = boxed(res.text().await?);
 
-    let status = res.status();
-    let headers = res.headers().clone();
-    let body = boxed(
-        res.text()
-            .await
-            .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))?,
-    );
+	let mut response = Response::builder().status(status);
 
-    let mut response = Response::builder().status(status);
+	if response.headers_ref().is_none() {
+		*response.headers_mut().unwrap() = HeaderMap::new();
+	}
+	for (key, value) in headers.iter() {
+		response.headers_mut().unwrap().append(key, value.clone());
+	}
 
-    if response.headers_ref().is_none() {
-        *response.headers_mut().unwrap() = HeaderMap::new();
-    }
-    for (key, value) in headers.iter() {
-        response.headers_mut().unwrap().append(key, value.clone());
-    }
-
-    response
-        .body(body)
-        .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))
+	response.body(body).map_err(Error::from)
 }
 
 #[axum_macros::debug_handler]
-async fn get_static_file(uri: Uri) -> Result<Response, (StatusCode, String)> {
-    let req = Request::builder().uri(uri).body(Body::empty()).unwrap();
+async fn get_static_file(uri: Uri) -> Result<Response> {
+	let req = Request::builder().uri(uri).body(Body::empty()).unwrap();
 
-    match ServeDir::new(format!("{}/dist", env!("TC_FRONTEND_DIR")))
-        .oneshot(req)
-        .await
-    {
-        Ok(res) => Ok(res.map(boxed)),
-        Err(err) => Err((
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Something went wrong: {err}"),
-        )),
-    }
+	match ServeDir::new(fmt!("{}/dist", env!("TC_FRONTEND_DIR")))
+		.oneshot(req)
+		.await
+	{
+		Ok(res) => Ok(res.map(boxed)),
+		Err(err) => Err(Error::ResponseError(
+			StatusCode::INTERNAL_SERVER_ERROR,
+			fmt!("Something went wrong: {err}"),
+		)),
+	}
 }
 
 #[axum_macros::debug_handler]
-pub async fn file_handler(uri: Uri) -> Result<Response, (StatusCode, String)> {
-    let res = get_static_file(uri.clone()).await?;
+pub async fn file_handler(uri: Uri) -> Result<Response> {
+	let res = get_static_file(uri.clone()).await?;
 
-    if res.status() == StatusCode::NOT_FOUND {
-        match format!("{}.html", uri).parse() {
-            Ok(uri_html) => get_static_file(uri_html).await,
-            Err(_) => Err((StatusCode::INTERNAL_SERVER_ERROR, "Invalid URI".to_string())),
-        }
-    } else {
-        Ok(res)
-    }
+	if res.status() == StatusCode::NOT_FOUND {
+		match fmt!("{}.html", uri).parse() {
+			Ok(uri_html) => get_static_file(uri_html).await,
+			Err(_) => Err(Error::ResponseError(
+				StatusCode::INTERNAL_SERVER_ERROR,
+				"Invalid URI".to_string(),
+			)),
+		}
+	} else {
+		Ok(res)
+	}
 }
 
+// The main function can change depending on the mode that the application was
+// compiled in.
+//
+// If the application was compiled in debug mode:
+// - The application starts a vite server as a child process, running the front-end
+// - It then forwards every request made to itself to the vite server
+// - It spins up the websocket server, so that the front-end can get the logs and anything
+//   else that may be sent through the pipe via websockets.
+//
+// If the application was compiled in release mode:
+// - The application serves the static files compiled by vite
+// - It spins up the websocket server, so that the front-end can get the logs and anything
+//   else that may be sent through the pipe via websockets.
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt::init();
+	tracing_subscriber::fmt::init();
 
-    let app = if cfg!(debug_assertions) {
-        Router::new().fallback(get(forward_requests))
-    } else {
-        Router::new().fallback(get(file_handler))
-    };
+	let app = if cfg!(debug_assertions) {
+		// if we're in debug, we have to forward the requests made by the client
+		// connecting to us, to the vite server that is being ran in the background.
+		Router::new().fallback(get(forward_requests))
+	} else {
+		// if we're in release, we can serve the static files directly, without needing
+		// to run vite in the background.
+		Router::new().fallback(get(file_handler))
+	};
 
-    let router = Router::new().nest("/api", get_router());
-    let app = app.merge(router);
+	// we can use this as an endpoint for any additional actions the front-end may
+	// need besides just receiving logs.
+	let router = Router::new().nest("/api", get_router());
+	let app = app.merge(router);
 
-    if cfg!(debug_assertions) {
-        let frontend = Arc::new(Mutex::new(initialise()));
-        let frontend_pid = frontend
-            .lock()
-            .expect("could not get lock on child process")
-            .id();
+	// this only applies to debug builds - everything here should be compiled
+	// out/ignored completely during release runtime.
+	if cfg!(debug_assertions) {
+		// we need to get a lock on the vite process, so we can safefully shut it down
+		// after this server has been closed - we don't want random zombie processes
+		// that cannot be stopped.
+		let frontend = Arc::new(Mutex::new(initialise()));
+		let frontend_pid = frontend.lock().id(); // we get the pid so that the vite server can be manually killed if need be
 
-        let frontend_clone = frontend.clone();
+		let frontend_clone = frontend.clone();
 
-        ctrlc::set_handler(move || {
-            tracing::info!("Recieved CTRL+C signal, terminating...");
+		ctrlc::set_handler(move || {
+			tracing::info!("Recieved CTRL+C signal, terminating...");
 
-            tracing::debug!("Terminating front-end server...");
-            frontend_clone
-                .lock()
-                .expect("could not get lock on child process")
-                .kill()
-                .unwrap_or_else(|_| panic!("could not automatically kill child frontend server process with id: {frontend_pid}"));
-            tracing::debug!("... Done");
+			tracing::debug!("Terminating front-end server...");
+			frontend_clone.lock().kill().unwrap_or_else(|_| {
+				panic!("could not automatically kill child frontend server process with id: {frontend_pid}")
+			});
+			tracing::debug!("... Done");
 
-            exit(0);
-        })
-        .expect("could not set CTRL+C handler");
+			exit(0); // we exit the main program gracefully
+		})
+		.expect("could not set CTRL+C handler");
 
-        tracing::debug!("Front-end process id: {frontend_pid}");
-        tracing::debug!("Front-end web server listening on 'http://localhost:8080'");
-    }
+		tracing::debug!("Front-end process id: {frontend_pid}");
+		tracing::debug!("Front-end web server listening on 'http://localhost:8080'");
+	}
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
-    tracing::info!("Listening on http://{addr}");
+	// bind the front-end to :3000
+	let frontend_addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+	tracing::info!("Frontend on http://{frontend_addr}");
+	tokio::spawn(axum::Server::bind(&frontend_addr).serve(app.into_make_service()));
 
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
-        .await
-        .unwrap_or_else(|_| panic!("could not bind server to {addr}"));
+	// bind the websocket server to :3001
+	let websocket_addr = SocketAddr::from(([127, 0, 0, 1], 3001));
+	let ws_socket = TcpListener::bind(&websocket_addr)
+		.await
+		.unwrap_or_else(|err| {
+			panic!("An error occurred when binding websockets to port: {err}")
+		});
+	tracing::debug!("Websockets for frontend listening on ws://{websocket_addr}");
+
+	let peers = PeerMap::new();
+	while let Ok((raw_stream, addr)) = ws_socket.accept().await {
+		tokio::spawn(ws::handle_connection(peers.clone(), raw_stream, addr));
+	}
 }
