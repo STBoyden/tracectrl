@@ -11,6 +11,9 @@ pub async fn handle_connection(
 	raw_stream: TcpStream,
 	addr: SocketAddr,
 ) {
+	// TODO(depends on log server): Send logs received on the log server, and pass through
+	// to the websockets.
+
 	tracing::debug!("Recieved connection from {addr}");
 
 	'inner: {
@@ -23,12 +26,12 @@ pub async fn handle_connection(
 		};
 
 		tracing::debug!("Websocket connection established with {addr}");
-		let (tx, rx) = unbounded();
+		let (tx, _rx) = unbounded();
 		peers_map.lock().insert(addr, tx);
 
-		let (outgoing, incoming) = stream.split();
+		let (_outgoing, incoming) = stream.split();
 
-		let receive_ids = incoming.try_for_each(|msg| {
+		let _receive_ids = incoming.try_for_each(|msg| {
 			_ = msg;
 
 			future::ok(())

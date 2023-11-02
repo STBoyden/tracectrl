@@ -13,6 +13,7 @@
 
 use std::ops::{Deref, DerefMut};
 
+pub mod apidoc;
 pub mod arctex;
 pub mod peer_map;
 mod url_try_froms;

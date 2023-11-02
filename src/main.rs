@@ -7,7 +7,7 @@ mod ws;
 use crate::{
 	prelude::*,
 	router::get_router,
-	utils::{arctex::ArcTex, peer_map::PeerMap, W},
+	utils::{apidoc::ApiDoc, arctex::ArcTex, peer_map::PeerMap, W},
 };
 
 #[cfg(debug_assertions)]
@@ -27,6 +27,8 @@ use axum::{
 use tokio::net::TcpListener;
 use tower::ServiceExt;
 use tower_http::services::ServeDir;
+use utoipa::OpenApi;
+use utoipa_redoc::{Redoc, Servable};
 
 #[cfg(debug_assertions)]
 fn initialise() -> Child {
@@ -42,7 +44,7 @@ fn initialise() -> Child {
 
 #[cfg(not(debug_assertions))]
 fn initialise() -> Child {
-	unreachable!()
+	unreachable!("should never be reached in release mode builds")
 }
 
 #[axum_macros::debug_handler]
@@ -82,10 +84,7 @@ async fn get_static_file(uri: Uri) -> Result<Response> {
 		.await
 	{
 		Ok(res) => Ok(res.map(boxed)),
-		Err(err) => Err(Error::ResponseError(
-			StatusCode::INTERNAL_SERVER_ERROR,
-			fmt!("Something went wrong: {err}"),
-		)),
+		Err(_) => unreachable!("error type is Infallible"),
 	}
 }
 
@@ -96,9 +95,9 @@ pub async fn file_handler(uri: Uri) -> Result<Response> {
 	if res.status() == StatusCode::NOT_FOUND {
 		match fmt!("{uri}.html").parse() {
 			Ok(uri_html) => get_static_file(uri_html).await,
-			Err(_) => Err(Error::ResponseError(
+			Err(err) => Err(Error::ResponseError(
 				StatusCode::INTERNAL_SERVER_ERROR,
-				"Invalid URI".to_string(),
+				err.to_string(),
 			)),
 		}
 	} else {
@@ -136,7 +135,9 @@ async fn main() {
 
 	// we can use this as an endpoint for any additional actions the front-end may
 	// need besides just receiving logs.
-	let router = Router::new().nest("/api", get_router());
+	let router = Router::new()
+		.nest("/api", get_router())
+		.merge(Redoc::with_url("/docs", ApiDoc::openapi()));
 	let app = app.merge(router);
 
 	// this only applies to debug builds - everything here should be compiled
@@ -163,14 +164,15 @@ async fn main() {
 		})
 		.expect("could not set CTRL+C handler");
 
-		tracing::debug!("Front-end process id: {frontend_pid}");
-		tracing::debug!("Front-end web server listening on 'http://localhost:8080'");
+		tracing::debug!("Vite process id: {frontend_pid}");
+		tracing::debug!("Vite server reachable on 'http://localhost:8080'");
 	}
 
 	// bind the front-end to :3000
-	let frontend_addr = SocketAddr::from(([127, 0, 0, 1], 3000));
-	tracing::info!("Frontend on http://{frontend_addr}");
-	tokio::spawn(axum::Server::bind(&frontend_addr).serve(app.into_make_service()));
+	let listening_addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+	tracing::info!("Listening on http://{listening_addr}");
+	tracing::info!("API documentation available at http://{listening_addr}/docs");
+	tokio::spawn(axum::Server::bind(&listening_addr).serve(app.into_make_service()));
 
 	// bind the websocket server to :3001
 	let websocket_addr = SocketAddr::from(([127, 0, 0, 1], 3001));
