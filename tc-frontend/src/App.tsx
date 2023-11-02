@@ -6,17 +6,17 @@ import { Toaster } from "@/components/ui/toaster";
 import { SettingsProvider } from "./components/settings-provider";
 
 function App() {
-  return (
-    <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
-      <SettingsProvider>
-        <>
-          <HeaderBar />
+	return (
+		<ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
+			<SettingsProvider>
+				<>
+					<HeaderBar />
 
-          <Toaster />
-        </>
-      </SettingsProvider>
-    </ThemeProvider>
-  );
+					<Toaster />
+				</>
+			</SettingsProvider>
+		</ThemeProvider>
+	);
 }
 
 export default App;
