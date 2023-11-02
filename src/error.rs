@@ -1,3 +1,6 @@
+//! Contains the [`enum@Error`] type used by the rest of the application and an
+//! [`IntoResponse`] implementation for usage with [`axum`].
+
 use std::convert::Infallible;
 
 use axum::response::IntoResponse;
