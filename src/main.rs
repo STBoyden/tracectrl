@@ -1,3 +1,6 @@
+#![warn(clippy::pedantic)]
+
+mod api;
 mod error;
 mod prelude;
 mod router;
@@ -65,7 +68,7 @@ async fn forward_requests(request: Request<Body>) -> Result<Response> {
 	if response.headers_ref().is_none() {
 		*response.headers_mut().unwrap() = HeaderMap::new();
 	}
-	for (key, value) in headers.iter() {
+	for (key, value) in &headers {
 		response.headers_mut().unwrap().append(key, value.clone());
 	}
 
@@ -74,22 +77,22 @@ async fn forward_requests(request: Request<Body>) -> Result<Response> {
 
 #[axum_macros::debug_handler]
 async fn get_static_file(uri: Uri) -> Result<Response> {
-	let req = Request::builder()
+	let request = Request::builder()
 		.uri(uri)
 		.body(Body::empty())
 		.map_err(Error::from)?;
 
 	match ServeDir::new(fmt!("{}/dist", env!("TC_FRONTEND_DIR")))
-		.oneshot(req)
+		.oneshot(request)
 		.await
 	{
-		Ok(res) => Ok(res.map(boxed)),
+		Ok(response) => Ok(response.map(boxed)),
 		Err(_) => unreachable!("error type is Infallible"),
 	}
 }
 
 #[axum_macros::debug_handler]
-pub async fn file_handler(uri: Uri) -> Result<Response> {
+async fn file_handler(uri: Uri) -> Result<Response> {
 	let res = get_static_file(uri.clone()).await?;
 
 	if res.status() == StatusCode::NOT_FOUND {
