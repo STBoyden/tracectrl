@@ -9,7 +9,7 @@ use tokio_tungstenite::tungstenite::protocol::Message;
 type Tx = UnboundedSender<Message>;
 type PeerMapInner = ArcTex<DashMap<SocketAddr, Tx>>;
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct PeerMap(PeerMapInner);
 
 impl PeerMap {
