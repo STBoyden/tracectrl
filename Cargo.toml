@@ -15,6 +15,8 @@ futures-channel = "0.3.29"
 futures-util = "0.3.28"
 parking_lot = "0.12.1"
 reqwest = "0.11.22"
+serde = { version = "1.0.192", features = ["derive"] }
+serde_json = "1.0.108"
 thiserror = "1.0.50"
 tokio = { version = "1.32.0", features = ["full"] }
 tokio-tungstenite = "0.20.0"
