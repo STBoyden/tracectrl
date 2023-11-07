@@ -18,6 +18,7 @@ pub mod arctex;
 pub mod peer_map;
 mod url_try_froms;
 
+#[derive(Debug)]
 pub struct W<T>(pub T);
 
 impl<T> Deref for W<T> {
