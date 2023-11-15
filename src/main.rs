@@ -1,16 +1,16 @@
 #![warn(clippy::pedantic)]
+#![allow(clippy::module_name_repetitions)]
 
 mod api;
 mod error;
 mod prelude;
-mod router;
 mod utils;
 mod ws;
 
 use crate::{
+	api::{ApiDoc, ApiRouter},
 	prelude::*,
-	router::get_router,
-	utils::{apidoc::ApiDoc, arctex::ArcTex, peer_map::PeerMap, W},
+	utils::{arctex::ArcTex, log_socket::new_log_socket, peer_map::PeerMap, W},
 };
 
 #[cfg(debug_assertions)]
@@ -32,6 +32,7 @@ use tower::ServiceExt;
 use tower_http::services::ServeDir;
 use utoipa::OpenApi;
 use utoipa_redoc::{Redoc, Servable};
+use utoipa_swagger_ui::SwaggerUi;
 
 #[cfg(debug_assertions)]
 fn initialise() -> Child {
@@ -136,11 +137,16 @@ async fn main() {
 		Router::new().fallback(get(file_handler))
 	};
 
+	// create a new log sender and receiver for communicating to/from the websocket server
+	// and the api
+	let (tx, _) = new_log_socket();
+
 	// we can use this as an endpoint for any additional actions the front-end may
 	// need besides just receiving logs.
 	let router = Router::new()
-		.nest("/api", get_router())
-		.merge(Redoc::with_url("/docs", ApiDoc::openapi()));
+		.nest("/api", ApiRouter::new_router(tx.clone()))
+		.merge(SwaggerUi::new("/docs/swagger").url("/docs/openapi.json", ApiDoc::openapi()))
+		.merge(Redoc::with_url("/docs/redoc", ApiDoc::openapi()));
 	let app = app.merge(router);
 
 	// this only applies to debug builds - everything here should be compiled
@@ -174,7 +180,12 @@ async fn main() {
 	// bind the front-end to :3000
 	let listening_addr = SocketAddr::from(([127, 0, 0, 1], 3000));
 	tracing::info!("Listening on http://{listening_addr}");
-	tracing::info!("API documentation available at http://{listening_addr}/docs");
+	tracing::info!(
+		"Redoc API documentation available at http://{listening_addr}/docs/redoc"
+	);
+	tracing::info!(
+		"SwaggerUI API documentation available at http://{listening_addr}/docs/swagger"
+	);
 	tokio::spawn(axum::Server::bind(&listening_addr).serve(app.into_make_service()));
 
 	// bind the websocket server to :3001
@@ -188,6 +199,7 @@ async fn main() {
 
 	let peers = PeerMap::new();
 	while let Ok((raw_stream, addr)) = ws_socket.accept().await {
-		tokio::spawn(ws::handle_connection(peers.clone(), raw_stream, addr));
+		let rx = tx.subscribe();
+		tokio::spawn(ws::handle_connection(peers.clone(), raw_stream, addr, rx));
 	}
 }

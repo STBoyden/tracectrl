@@ -1,8 +1,17 @@
+use chrono::{DateTime, Utc};
+use utoipa::ToSchema;
+use uuid::Uuid;
+
 use crate::api::types::{Snippet, Trace};
 
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize, ToSchema)]
 pub struct Log {
-	language: String,
-	snippet: Snippet,
-	backtrace: Trace,
+	pub id: Uuid,
+	#[schema(example = "Rust")]
+	pub language: String,
+	pub snippet: Snippet,
+	pub backtrace: Trace,
+	#[schema(example = json!(["This program was compiled without symbols."]))]
+	pub warnings: Vec<String>,
+	pub date: DateTime<Utc>,
 }

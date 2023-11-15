@@ -13,10 +13,11 @@
 
 use std::ops::{Deref, DerefMut};
 
-pub mod apidoc;
 pub mod arctex;
+pub mod log_socket;
 pub mod peer_map;
 mod url_try_froms;
+pub mod uuid;
 
 #[derive(Debug)]
 pub struct W<T>(pub T);

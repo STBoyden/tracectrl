@@ -1,15 +1,16 @@
 use std::net::SocketAddr;
 
-use crate::utils::peer_map::PeerMap;
+use crate::utils::{log_socket::LogReceiver, peer_map::PeerMap};
 
 use futures_channel::mpsc::unbounded;
-use futures_util::{future, stream::TryStreamExt, StreamExt};
+use futures_util::{SinkExt, StreamExt};
 use tokio::net::TcpStream;
 
 pub async fn handle_connection(
 	peers_map: PeerMap,
 	raw_stream: TcpStream,
 	addr: SocketAddr,
+	mut log_receiver: LogReceiver,
 ) {
 	// TODO(depends on log server): Send logs received on the log server, and pass through
 	// to the websockets.
@@ -29,12 +30,24 @@ pub async fn handle_connection(
 		let (tx, _rx) = unbounded();
 		peers_map.lock().insert(addr, tx);
 
-		let (_outgoing, incoming) = stream.split();
+		let (mut outgoing, _incoming) = stream.split();
 
-		let _receive_ids = incoming.try_for_each(|msg| {
-			_ = msg;
+		// let _receive_ids = incoming.try_for_each(|_| future::ok(()));
 
-			future::ok(())
-		});
+		while let Ok(log) = log_receiver.recv().await {
+			let log = log.clone();
+
+			if let Err(err) = outgoing
+				.send(
+					serde_json::to_string(&log)
+						.expect("could not parse log into JSON")
+						.into(),
+				)
+				.await
+			{
+				tracing::error!("Could not send log to front-end: {err}");
+				continue;
+			};
+		}
 	};
 }
