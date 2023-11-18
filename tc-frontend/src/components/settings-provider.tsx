@@ -5,7 +5,7 @@ import * as z from "zod";
 const settingsKey = "tracectrl-settings" as const;
 
 type Settings = {
-	websocketHost?: string;
+	websocketHost: string;
 };
 
 export const _defaultSettings: Settings = {

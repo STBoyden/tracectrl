@@ -9,6 +9,7 @@ import {
 import {
 	Table,
 	TableBody,
+	TableCaption,
 	TableCell,
 	TableHead,
 	TableHeader,
@@ -18,11 +19,13 @@ import {
 interface DataTableProps<TData, TValue> {
 	columns: ColumnDef<TData, TValue>[];
 	data: TData[];
+	caption?: string;
 }
 
 export function DataTable<TData, TValue>({
 	columns,
 	data,
+	caption,
 }: DataTableProps<TData, TValue>) {
 	const table = useReactTable({
 		data,
@@ -31,8 +34,9 @@ export function DataTable<TData, TValue>({
 	});
 
 	return (
-		<div className="rounded-md border">
+		<div className="border">
 			<Table>
+				{caption && <TableCaption>{caption}</TableCaption>}
 				<TableHeader>
 					{table.getHeaderGroups().map((headerGroup) => (
 						<TableRow key={headerGroup.id}>

@@ -7,16 +7,21 @@ import {
 	CommandEmpty,
 	CommandGroup,
 	CommandInput,
+	CommandItem,
 	CommandList,
+	CommandSeparator,
 } from "@/components/ui/command";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { Cross1Icon } from "@radix-ui/react-icons";
 import { useEffect, useState } from "react";
+import { useLogs } from "@/components/logs-provider";
+import dayjs from "dayjs";
 
 export function HeaderBar() {
 	const [open, setOpen] = useState(false);
 	const [search, setSearch] = useState("");
+	const { logs } = useLogs();
 
 	useEffect(() => {
 		const down = (e: KeyboardEvent) => {
@@ -71,7 +76,19 @@ export function HeaderBar() {
 					></CommandInput>
 					<CommandEmpty>Nothing found...</CommandEmpty>
 					<CommandList>
-						<CommandGroup heading="Logs"></CommandGroup>
+						<CommandGroup heading="Logs">
+							{logs &&
+								logs.logs.map((log) => (
+									<CommandItem className="flex w-full p-2">
+										<code className="flex text-left">{log.message}</code>
+										<span className="mx-auto"></span>
+										<span className="flex text-right">
+											{dayjs(log.date).format("YYYY-MM-DD HH:mm:ss")}
+										</span>
+									</CommandItem>
+								))}
+						</CommandGroup>
+						<CommandSeparator />
 						<CommandGroup heading="Settings"></CommandGroup>
 					</CommandList>
 				</CommandDialog>
