@@ -1,4 +1,4 @@
-use std::net::SocketAddr;
+use std::{net::SocketAddr, time::Duration};
 
 use crate::utils::{log_socket::LogReceiver, peer_map::PeerMap};
 
@@ -28,13 +28,19 @@ pub async fn handle_connection(
 
 		tracing::debug!("Websocket connection established with {addr}");
 		let (tx, _rx) = unbounded();
-		peers_map.lock().insert(addr, tx);
+
+		if let Some(map) = peers_map.try_lock_for(Duration::new(0, 50)) {
+			map.insert(addr, tx);
+		} else {
+			tracing::info!("Could not get lock on peers map for 50 nanoseconds. Is there another connection? Continuing anyway...");
+		}
 
 		let (mut outgoing, _incoming) = stream.split();
 
 		// let _receive_ids = incoming.try_for_each(|_| future::ok(()));
 
 		while let Ok(log) = log_receiver.recv().await {
+			tracing::debug!("Received log, sending to {addr}");
 			let log = log.clone();
 
 			if let Err(err) = outgoing
