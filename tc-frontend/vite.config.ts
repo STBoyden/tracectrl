@@ -8,6 +8,9 @@ export default defineConfig({
 	server: {
 		port: 8080,
 		strictPort: true,
+		hmr: {
+			port: 8081,
+		},
 		proxy: {
 			"/ws": {
 				ws: true,
