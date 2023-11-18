@@ -178,7 +178,7 @@ async fn main() {
 	}
 
 	// bind the front-end to :3000
-	let listening_addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+	let listening_addr = SocketAddr::from(([0, 0, 0, 0], 3000));
 	tracing::info!("Listening on http://{listening_addr}");
 	tracing::info!(
 		"Redoc API documentation available at http://{listening_addr}/docs/redoc"
@@ -189,7 +189,7 @@ async fn main() {
 	tokio::spawn(axum::Server::bind(&listening_addr).serve(app.into_make_service()));
 
 	// bind the websocket server to :3001
-	let websocket_addr = SocketAddr::from(([127, 0, 0, 1], 3001));
+	let websocket_addr = SocketAddr::from(([0, 0, 0, 0], 3001));
 	let ws_socket = TcpListener::bind(&websocket_addr)
 		.await
 		.unwrap_or_else(|err| {
