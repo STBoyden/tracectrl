@@ -7,6 +7,8 @@ use crate::api::types::{Snippet, Trace};
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize, ToSchema)]
 pub struct Log {
 	pub id: Uuid,
+	#[schema(example = "hello")]
+	pub message: String,
 	#[schema(example = "Rust")]
 	pub language: String,
 	pub snippet: Snippet,

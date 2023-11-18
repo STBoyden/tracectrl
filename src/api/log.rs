@@ -21,6 +21,8 @@ use crate::{
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize, ToSchema)]
 pub struct LogBody {
+	#[schema(example = "hello")]
+	pub message: String,
 	#[schema(example = "Rust")]
 	pub language: String,
 	#[schema(example=json!({"1": r#"log("hello")"#}))]
@@ -35,6 +37,7 @@ impl From<LogBody> for Log {
 
 		Log {
 			id: Uuid::new_v4(),
+			message: value.message,
 			language: value.language,
 			backtrace: value.backtrace.into(),
 			snippet: value.snippet,
@@ -75,6 +78,10 @@ pub async fn add_log(
 
 	let log: Log = log.into();
 	logs.push(log.clone());
+
+	if let Err(err) = store.sender.send(log.clone()) {
+		tracing::error!("Could not send log to back-end: {err}");
+	}
 
 	Json(Response {
 		message: fmt!("Log was created with ID {}", log.id),
