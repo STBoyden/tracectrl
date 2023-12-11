@@ -68,7 +68,8 @@ pub async fn list_logs(State(store): State<Store>) -> Json<Vec<Log>> {
 	path="/api/log",
 	request_body=LogBody,
 	responses(
-		(status=200, description="Log was created")
+		(status=200, description="Log was created"),
+		(status=500, description="An internal server error occurred")
 	),
 )]
 #[axum_macros::debug_handler]
@@ -89,10 +90,8 @@ pub async fn add_log(
 		tracing::error!("Could not send log to back-end: {err}");
 	}
 
-	let log = log.clone();
-
 	let snippet_id = sqlx::query!(
-		r#"INSERT INTO snippet (line, code) VALUES ($1, $2) RETURNING id"#,
+		r#"INSERT INTO snippets (line, code) VALUES ($1, $2) RETURNING id"#,
 		log.snippet.line,
 		log.snippet.code.clone()
 	)
@@ -102,17 +101,18 @@ pub async fn add_log(
 
 	let layer_results = log.backtrace.layers.iter().map(|layer| {
 		sqlx::query!(
-			r#"INSERT INTO snippet (line, code) VALUES ($1, $2) RETURNING id"#,
+			r#"INSERT INTO snippets (line, code) VALUES ($1, $2) RETURNING id"#,
 			layer.line,
 			layer.code.clone()
 		)
 		.fetch_one(&pool)
 	});
 
-	let backtrace_id = sqlx::query!(r#"INSERT INTO backtrace DEFAULT VALUES RETURNING id"#)
-		.fetch_one(&pool)
-		.await?
-		.id;
+	let backtrace_id =
+		sqlx::query!(r#"INSERT INTO backtraces DEFAULT VALUES RETURNING id"#)
+			.fetch_one(&pool)
+			.await?
+			.id;
 
 	let layers = log.backtrace.layers.len();
 	for future in layer_results {
@@ -129,7 +129,7 @@ pub async fn add_log(
 	}
 
 	let log_id= sqlx::query!(
-		r#"INSERT INTO logs (id, message, language, snippet, backtrace, warnings, date) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id"#,
+		r#"INSERT INTO logs (id, message, language, snippet_id, backtrace_id, warnings, date) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id"#,
 		log.id,
 		log.message.clone(),
 		log.language.clone(),

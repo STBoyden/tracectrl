@@ -30,7 +30,7 @@ pub enum Error {
 
 impl IntoResponse for Error {
 	fn into_response(self) -> axum::response::Response {
-		match self {
+		let res = match self {
 			Error::Generic(message) => (StatusCode::INTERNAL_SERVER_ERROR, message),
 			Error::ResponseError(status_code, message) => (status_code, message),
 			Error::UrlError(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
@@ -39,7 +39,10 @@ impl IntoResponse for Error {
 			Error::ReqwestError(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
 			Error::SqlxError(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
 			Error::Infallible(_) => unreachable!(),
-		}
-		.into_response()
+		};
+
+		tracing::error!("An error occurred: {}", res.1);
+
+		res.into_response()
 	}
 }
