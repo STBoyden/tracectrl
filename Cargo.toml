@@ -18,6 +18,7 @@ parking_lot = "0.12.1"
 reqwest = "0.11.22"
 serde = { version = "1.0.192", features = ["derive"] }
 serde_json = "1.0.108"
+sqlx = { version = "0.7.3", features = ["runtime-tokio", "postgres", "json", "chrono", "uuid", "migrate"] }
 thiserror = "1.0.50"
 tokio = { version = "1.32.0", features = ["full"] }
 tokio-tungstenite = "0.20.0"

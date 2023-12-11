@@ -27,6 +27,7 @@ fn main() {
 	println!("cargo:rerun-if-changed=tc-frontend/tsconfig.json");
 	println!("cargo:rerun-if-changed=tc-frontend/svelte.config.js");
 	println!("cargo:rerun-if-changed=tc-frontend/vite.config.js");
+	println!("cargo:rerun-if-changed=migrations");
 
 	let Some(package_manager) = KNOWN_PACKAGE_MANAGERS
 		.iter()

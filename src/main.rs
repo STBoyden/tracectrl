@@ -1,5 +1,10 @@
 #![warn(clippy::pedantic)]
-#![allow(clippy::module_name_repetitions)]
+#![allow(
+	clippy::module_name_repetitions,
+	clippy::enum_variant_names,
+	clippy::cast_possible_truncation,
+	clippy::cast_possible_wrap
+)]
 
 mod api;
 mod error;
@@ -16,6 +21,7 @@ use crate::{
 #[cfg(debug_assertions)]
 use std::process::{Command, Stdio};
 use std::{
+	env,
 	net::SocketAddr,
 	process::{exit, Child},
 };
@@ -27,6 +33,7 @@ use axum::{
 	routing::get,
 	Router,
 };
+use sqlx::postgres::PgPoolOptions;
 use tokio::net::TcpListener;
 use tower::ServiceExt;
 use tower_http::services::ServeDir;
@@ -127,6 +134,25 @@ async fn main() {
 	dotenv::dotenv().ok();
 	tracing_subscriber::fmt::init();
 
+	let db_connection = if let Ok(var) = env::var("DATABASE_URL") {
+		assert!(
+			!var.is_empty(),
+			"DB_CONN is empty! Must be a valid postgresql connection string."
+		);
+
+		var
+	} else {
+		panic!(
+			"DB_CONN is not present at runtime! Must be a valid postgresql connection string."
+		);
+	};
+
+	let pool = PgPoolOptions::new()
+		.max_connections(10)
+		.connect(&db_connection)
+		.await
+		.expect("could not connect to postgresql database");
+
 	let app = if cfg!(debug_assertions) {
 		// if we're in debug, we have to forward the requests made by the client
 		// connecting to us, to the vite server that is being ran in the background.
@@ -144,7 +170,7 @@ async fn main() {
 	// we can use this as an endpoint for any additional actions the front-end may
 	// need besides just receiving logs.
 	let router = Router::new()
-		.nest("/api", ApiRouter::new_router(tx.clone()))
+		.nest("/api", ApiRouter::new_router(tx.clone(), pool))
 		.merge(SwaggerUi::new("/docs/swagger").url("/docs/openapi.json", ApiDoc::openapi()))
 		.merge(Redoc::with_url("/docs/redoc", ApiDoc::openapi()));
 	let app = app.merge(router);

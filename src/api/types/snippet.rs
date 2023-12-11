@@ -2,10 +2,10 @@ use std::ops::Deref;
 
 use utoipa::ToSchema;
 
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize, ToSchema)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize, ToSchema, sqlx::FromRow)]
 pub struct Snippet {
 	#[schema(example = 1, minimum = 1)]
-	pub line: u32,
+	pub line: i32,
 	#[schema(example = r#"log("hello")"#)]
 	pub code: String,
 }
@@ -19,7 +19,7 @@ impl Default for Snippet {
 	}
 }
 
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize, ToSchema)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize, ToSchema, sqlx::FromRow)]
 #[schema(example = Snippet::default)]
 pub struct Layer(pub Snippet);
 

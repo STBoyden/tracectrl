@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 use crate::api::types::{Snippet, Trace};
 
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize, ToSchema)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize, ToSchema, sqlx::FromRow)]
 pub struct Log {
 	pub id: Uuid,
 	#[schema(example = "hello")]

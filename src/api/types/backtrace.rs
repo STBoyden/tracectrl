@@ -7,11 +7,11 @@ use crate::api::types::{Layer, Snippet};
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize, ToSchema)]
 pub struct Trace {
 	#[schema(example=json!([Layer::default()]))]
-	layers: Vec<Layer>,
+	pub layers: Vec<Layer>,
 }
 
-impl From<BTreeMap<u32, String>> for Trace {
-	fn from(value: BTreeMap<u32, String>) -> Self {
+impl From<BTreeMap<i32, String>> for Trace {
+	fn from(value: BTreeMap<i32, String>) -> Self {
 		let mut layers = vec![];
 
 		for (key, value) in &value {

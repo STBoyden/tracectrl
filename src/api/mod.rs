@@ -6,10 +6,12 @@ use std::sync::Arc;
 use axum::{
 	http::StatusCode,
 	routing::{get, post},
+	Extension,
 	Router,
 };
 use chrono::{DateTime, Utc};
 use parking_lot::Mutex;
+use sqlx::PgPool;
 use utoipa::{OpenApi, ToSchema};
 
 use crate::{
@@ -62,11 +64,12 @@ pub struct Response {
 pub struct ApiRouter;
 
 impl ApiRouter {
-	pub fn new_router(log_sender: LogSender) -> Router {
+	pub fn new_router(log_sender: LogSender, pool: PgPool) -> Router {
 		Router::new()
 			.route("/logs", get(log::list_logs))
 			.route("/log", post(log::add_log))
 			.route("/log/:id", get(log::get_log))
 			.with_state(Store::new(log_sender))
+			.layer(Extension(pool))
 	}
 }

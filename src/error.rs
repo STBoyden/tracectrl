@@ -23,6 +23,8 @@ pub enum Error {
 	#[error(transparent)]
 	UrlError(#[from] url::ParseError),
 	#[error(transparent)]
+	SqlxError(#[from] sqlx::Error),
+	#[error(transparent)]
 	Infallible(#[from] Infallible),
 }
 
@@ -35,6 +37,7 @@ impl IntoResponse for Error {
 			Error::AxumError(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
 			Error::AxumUriError(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
 			Error::ReqwestError(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
+			Error::SqlxError(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
 			Error::Infallible(_) => unreachable!(),
 		}
 		.into_response()

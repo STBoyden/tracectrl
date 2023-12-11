@@ -3,9 +3,11 @@ use std::collections::BTreeMap;
 use axum::{
 	extract::{Path, State},
 	http::StatusCode,
+	Extension,
 	Json,
 };
 use chrono::Utc;
+use sqlx::PgPool;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
@@ -26,7 +28,7 @@ pub struct LogBody {
 	#[schema(example = "Rust")]
 	pub language: String,
 	#[schema(example=json!({"1": r#"log("hello")"#}))]
-	pub backtrace: BTreeMap<u32, String>,
+	pub backtrace: BTreeMap<i32, String>,
 	pub snippet: Snippet,
 	pub warnings: Vec<String>,
 }
@@ -71,22 +73,78 @@ pub async fn list_logs(State(store): State<Store>) -> Json<Vec<Log>> {
 )]
 #[axum_macros::debug_handler]
 pub async fn add_log(
+	Extension(pool): Extension<PgPool>,
 	State(store): State<Store>,
 	Json(log): Json<LogBody>,
-) -> Json<Response> {
-	let mut logs = store.logs.lock();
-
+) -> Result<Json<Response>> {
 	let log: Log = log.into();
-	logs.push(log.clone());
+
+	{
+		let mut logs = store.logs.lock();
+
+		logs.push(log.clone());
+	}
 
 	if let Err(err) = store.sender.send(log.clone()) {
 		tracing::error!("Could not send log to back-end: {err}");
 	}
 
-	Json(Response {
-		message: fmt!("Log was created with ID {}", log.id),
+	let log = log.clone();
+
+	let snippet_id = sqlx::query!(
+		r#"INSERT INTO snippet (line, code) VALUES ($1, $2) RETURNING id"#,
+		log.snippet.line,
+		log.snippet.code.clone()
+	)
+	.fetch_one(&pool)
+	.await?
+	.id;
+
+	let layer_results = log.backtrace.layers.iter().map(|layer| {
+		sqlx::query!(
+			r#"INSERT INTO snippet (line, code) VALUES ($1, $2) RETURNING id"#,
+			layer.line,
+			layer.code.clone()
+		)
+		.fetch_one(&pool)
+	});
+
+	let backtrace_id = sqlx::query!(r#"INSERT INTO backtrace DEFAULT VALUES RETURNING id"#)
+		.fetch_one(&pool)
+		.await?
+		.id;
+
+	let layers = log.backtrace.layers.len();
+	for future in layer_results {
+		let layer = future.await?;
+
+		sqlx::query!(
+			r#"INSERT INTO backtrace_snippet (backtrace_id, snippet_id, amount) VALUES ($1, $2, $3)"#,
+			backtrace_id,
+			layer.id,
+			layers as i32
+		)
+		.execute(&pool)
+		.await?;
+	}
+
+	let log_id= sqlx::query!(
+		r#"INSERT INTO logs (id, message, language, snippet, backtrace, warnings, date) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id"#,
+		log.id,
+		log.message.clone(),
+		log.language.clone(),
+		snippet_id,
+		backtrace_id,
+		&log.warnings.clone(),
+		log.date.naive_utc(),
+	).fetch_one(&pool)
+	.await?
+	.id;
+
+	Ok(Json(Response {
+		message: fmt!("Log was created with ID {log_id}"),
 		datetime: log.date,
-	})
+	}))
 }
 
 #[utoipa::path(
