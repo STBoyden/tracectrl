@@ -9,7 +9,7 @@ impl TryFrom<W<&AxumUri>> for ReqwestUrl {
 	type Error = Error;
 
 	fn try_from(value: W<&AxumUri>) -> Result<ReqwestUrl> {
-		ReqwestUrl::from_str(&fmt!("http://localhost:8080{}", *value)).map_err(Error::from)
+		ReqwestUrl::from_str(&fmt!("http://localhost:8000{}", *value)).map_err(Error::from)
 	}
 }
 

@@ -174,7 +174,7 @@ async fn main() {
 		.expect("could not set CTRL+C handler");
 
 		tracing::debug!("Vite process id: {frontend_pid}");
-		tracing::debug!("Vite server reachable on 'http://localhost:8080'");
+		tracing::debug!("Vite server reachable on 'http://localhost:8000'");
 	}
 
 	// bind the front-end to :3000

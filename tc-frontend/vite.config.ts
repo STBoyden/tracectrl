@@ -6,10 +6,10 @@ import path from "path";
 export default defineConfig({
 	plugins: [react()],
 	server: {
-		port: 8080,
+		port: 8000,
 		strictPort: true,
 		hmr: {
-			port: 8081,
+			port: 8001,
 		},
 		proxy: {
 			"/ws": {
