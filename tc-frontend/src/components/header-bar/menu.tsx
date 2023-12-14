@@ -81,7 +81,7 @@ export function HeaderBarMenu() {
 									</FormControl>
 									<FormDescription>
 										The host from where to receive the logs via websockets from.
-										By default, it is targeted at{" "}
+										By default, it is targeted at
 										<span className={cn("font-mono")}>
 											{_defaultSettings.websocketHost!}
 										</span>

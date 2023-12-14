@@ -15,6 +15,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import React from "react";
 
 interface DataTableProps<TData, TValue> {
 	columns: ColumnDef<TData, TValue>[];
@@ -34,7 +35,7 @@ export function DataTable<TData, TValue>({
 	});
 
 	return (
-		<div className="border">
+		<div className="border cursor-pointer">
 			<Table>
 				{caption && <TableCaption>{caption}</TableCaption>}
 				<TableHeader>
@@ -64,14 +65,18 @@ export function DataTable<TData, TValue>({
 							>
 								{row.getVisibleCells().map((cell) => (
 									<TableCell key={cell.id}>
-										{flexRender(cell.column.columnDef.cell, cell.getContext())}
+										{/* {flexRender(cell.column.columnDef.cell, cell.getContext())} */}
+										{cell.renderValue() as React.ReactNode}
 									</TableCell>
 								))}
 							</TableRow>
 						))
 					) : (
-						<TableRow>
-							<TableCell colSpan={columns.length} className="h-24 text-center">
+						<TableRow className="cursor-pointer">
+							<TableCell
+								colSpan={columns.length}
+								className="h-24 text-center cursor-pointer"
+							>
 								No results.
 							</TableCell>
 						</TableRow>

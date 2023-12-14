@@ -1,20 +1,24 @@
 import { createContext, useContext, useEffect, useState } from "react";
 
 type Theme = "dark" | "light" | "system";
+type Variant = "dark" | "light";
 
 type ThemeProviderProps = {
 	children: React.ReactNode;
 	defaultTheme?: Theme;
+	variant: Variant;
 	storageKey?: string;
 };
 
 type ThemeProviderState = {
 	theme: Theme;
+	variant: Variant;
 	setTheme: (theme: Theme) => void;
 };
 
 const initialState: ThemeProviderState = {
 	theme: "system",
+	variant: "dark",
 	setTheme: () => null,
 };
 
@@ -48,8 +52,23 @@ export function ThemeProvider({
 		root.classList.add(theme);
 	}, [theme]);
 
+	let variant = "" as Variant;
+
+	switch (theme) {
+		case "dark":
+		case "light":
+			variant = theme;
+			break;
+		case "system":
+			variant = window.matchMedia("(prefers-color-scheme: dark)").matches
+				? "dark"
+				: "light";
+			break;
+	}
+
 	const value = {
 		theme,
+		variant,
 		setTheme: (theme: Theme) => {
 			localStorage.setItem(storageKey, theme);
 			setTheme(theme);
