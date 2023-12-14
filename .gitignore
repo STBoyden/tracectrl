@@ -3,3 +3,4 @@
 Cargo.lock
 .dev-ps-pass
 .env
+/tc-frontend/vite.config.ts.timestamp-*.mjs
