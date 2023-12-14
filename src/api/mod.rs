@@ -4,7 +4,6 @@ pub mod types;
 use std::sync::Arc;
 
 use axum::{
-	http::StatusCode,
 	routing::{get, post},
 	Extension,
 	Router,
@@ -52,8 +51,6 @@ impl Store {
 		}
 	}
 }
-
-pub type ApiResult<T> = Result<T, StatusCode>;
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize, ToSchema)]
 pub struct Response {

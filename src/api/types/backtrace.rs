@@ -18,6 +18,7 @@ impl From<BTreeMap<i32, String>> for Trace {
 			layers.push(Layer(Snippet {
 				line: *key,
 				code: value.clone(),
+				file: None,
 			}));
 		}
 

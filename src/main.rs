@@ -212,7 +212,10 @@ async fn main() {
 	tracing::info!(
 		"SwaggerUI API documentation available at http://{listening_addr}/docs/swagger"
 	);
-	tokio::spawn(axum::Server::bind(&listening_addr).serve(app.into_make_service()));
+	tokio::spawn(
+		axum::Server::bind(&listening_addr)
+			.serve(app.into_make_service_with_connect_info::<SocketAddr>()),
+	);
 
 	// bind the websocket server to :3001
 	let websocket_addr = SocketAddr::from(([0, 0, 0, 0], 3001));

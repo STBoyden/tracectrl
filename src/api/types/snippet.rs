@@ -4,17 +4,22 @@ use utoipa::ToSchema;
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize, ToSchema, sqlx::FromRow)]
 pub struct Snippet {
-	#[schema(example = 1, minimum = 1)]
+	#[schema(example = 2, minimum = 1)]
 	pub line: i32,
-	#[schema(example = r#"log("hello")"#)]
+	#[schema(example = r#"fn main() {
+	log("hello");
+}"#)]
 	pub code: String,
+	#[schema(example = "src/main.rs")]
+	pub file: Option<String>,
 }
 
 impl Default for Snippet {
 	fn default() -> Self {
 		Self {
 			line: 1,
-			code: String::from(r#"log("hello")"#),
+			code: String::from(r#"log("hello");"#),
+			file: None,
 		}
 	}
 }
@@ -27,7 +32,8 @@ impl Default for Layer {
 	fn default() -> Self {
 		Self(Snippet {
 			line: 1,
-			code: String::from(r#"log("hello")"#),
+			code: String::from(r#"log("hello");"#),
+			file: None,
 		})
 	}
 }
