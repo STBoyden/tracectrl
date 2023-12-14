@@ -6,7 +6,7 @@ type Variant = "dark" | "light";
 type ThemeProviderProps = {
 	children: React.ReactNode;
 	defaultTheme?: Theme;
-	variant: Variant;
+	variant?: Variant;
 	storageKey?: string;
 };
 
