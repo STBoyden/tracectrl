@@ -10,6 +10,7 @@ use axum::{
 };
 use chrono::Utc;
 use common_macros::b_tree_map;
+use reqwest::StatusCode;
 use sqlx::{types::ipnetwork::IpNetwork, PgPool};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -293,18 +294,23 @@ pub async fn add_log(
 		r###"
 		INSERT INTO "Logs" (
 			client_id,
-			message, 
+			message,
 			message_type,
-			language, 
-			snippet, 
+			language,
+			snippet,
 			line_number,
-			backtrace_id, 
-			warnings, 
+			backtrace_id,
+			warnings,
 			date,
 			file_name,
 			received_from
 		) 
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) 
+		VALUES (
+			$1, $2, $3,
+			$4, $5, $6,
+			$7, $8, $9,
+			$10, $11
+		) 
 		RETURNING id
 		"###,
 		client_id,
