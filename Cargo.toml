@@ -43,3 +43,7 @@ uuid = { version = "1.5.0", features = ["v4", "serde", "fast-rng"] }
 
 [profile.dev.package.sqlx-macros]
 opt-level = 3
+
+[features]
+default = ["save_docs"]
+save_docs = []

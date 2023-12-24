@@ -36,6 +36,8 @@ use axum::{
 };
 use sqlx::postgres::PgPoolOptions;
 use tokio::net::TcpListener;
+#[cfg(feature = "save_docs")]
+use tokio::{fs::File, io::AsyncWriteExt};
 use tower::ServiceExt;
 use tower_http::services::ServeDir;
 use utoipa::OpenApi;
@@ -167,6 +169,22 @@ async fn main() {
 	// create a new log sender and receiver for communicating to/from the websocket server
 	// and the api
 	let (tx, _) = new_log_socket();
+
+	#[cfg(feature = "save_docs")]
+	{
+		let json = ApiDoc::openapi()
+			.to_pretty_json()
+			.expect("couldn't convert API into JSON representation");
+
+		let mut file = File::create("openapi.json")
+			.await
+			.expect("could not create file");
+
+		file
+			.write_all(json.as_bytes())
+			.await
+			.expect("could not write to file");
+	}
 
 	// we can use this as an endpoint for any additional actions the front-end may
 	// need besides just receiving logs.
