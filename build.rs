@@ -1,10 +1,11 @@
 use std::{env, process::Command};
 
 #[cfg(not(windows))]
-const KNOWN_PACKAGE_MANAGERS: [&str; 4] = ["bun", "npm", "pnpm", "yarn"];
-// const KNOWN_PACKAGE_MANAGERS: [&str; 4] = ["bun", "npm", "pnpm", "yarn"];
+const KNOWN_PACKAGE_MANAGERS: [&str; 4] = ["bun", "pnpm", "yarn", "npm"];
+
 #[cfg(windows)]
-const KNOWN_PACKAGE_MANAGERS: [&str; 4] = ["bun.exe", "npm.exe", "pnpm.exe", "yarn.exe"];
+const KNOWN_PACKAGE_MANAGERS: [&str; 5] =
+	["bun.exe", "pnpm.exe", "yarn.exe", "npm.exe", "npm.cmd"];
 
 fn find_pkg_manager(command_name: &str) -> bool {
 	env::var_os("PATH")
