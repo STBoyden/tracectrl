@@ -3,7 +3,7 @@ use std::{net::SocketAddr, time::Duration};
 use crate::utils::{log_socket::LogReceiver, peer_map::PeerMap};
 
 use futures_channel::mpsc::unbounded;
-use futures_util::{future, SinkExt, StreamExt, TryStreamExt};
+use futures_util::{SinkExt, StreamExt};
 use tokio::net::TcpStream;
 
 pub async fn handle_connection(
