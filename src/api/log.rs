@@ -9,13 +9,15 @@ use axum::{
 	Json,
 };
 use chrono::Utc;
+use common_macros::b_tree_map;
 use sqlx::{types::ipnetwork::IpNetwork, PgPool};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{
 	api::{
-		types::{Layer, Log, Snippet, Trace},
+		extractors::client::ClientId,
+		types::{Layer, Log, Trace},
 		Response,
 		Store,
 	},
@@ -38,11 +40,22 @@ fn single_host_prefix(ip_addr: &IpAddr) -> u8 {
 pub struct LogBody {
 	#[schema(example = "hello")]
 	pub message: String,
+	#[schema(example = "&str")]
+	pub message_type: String,
 	#[schema(example = "Rust")]
 	pub language: String,
-	#[schema(example=json!({"1": r#"log("hello");"#}))]
-	pub backtrace: BTreeMap<i32, String>,
-	pub snippet: Snippet,
+	pub backtrace: Trace,
+	#[schema(example = json!(b_tree_map!{
+				1 => "fn main() {",
+				2 => "    log(\"hello\");",
+				3 => "}"
+			}),
+	)]
+	pub snippet: BTreeMap<i32, String>,
+	#[schema(minimum = 1, example = 2)]
+	pub line_number: i32,
+	#[schema(example = "src/main.rs")]
+	pub file_name: String,
 	#[schema(example = json!(["This file was compiled without debug symbols."]))]
 	pub warnings: Vec<String>,
 }
@@ -54,46 +67,95 @@ impl From<LogBody> for Log {
 		Log {
 			id: Uuid::new_v4(),
 			message: value.message,
+			message_type: value.message_type,
 			language: value.language,
-			backtrace: value.backtrace.into(),
+			backtrace: value.backtrace,
 			snippet: value.snippet,
+			line_number: value.line_number,
 			warnings: value.warnings,
+			file_name: value.file_name,
 			date: Utc::now(),
 			received_from: None,
 		}
 	}
 }
 
-#[utoipa::path(
-	get,
-	path="/api/logs",
-	responses(
-		(status=200, description="List all the logs received by the server", body=[Log])
-	),
-)]
-#[axum_macros::debug_handler]
-pub async fn list_logs(Extension(pool): Extension<PgPool>) -> Result<Json<Vec<Log>>> {
-	let mut log_records = sqlx::query!(r#"SELECT * FROM logs"#)
+async fn list_logs_for_user(
+	pool: PgPool,
+	ClientId(client_id): ClientId,
+) -> Result<Json<Vec<Log>>> {
+	let mut logs = vec![];
+
+	let log_records = sqlx::query!(
+		r###"
+	SELECT * FROM "Logs"
+	WHERE client_id = $1
+	"###,
+		client_id
+	)
+	.fetch_all(&pool)
+	.await?;
+
+	for log_record in log_records {
+		let mut traces = vec![];
+		let trace_records = sqlx::query!(
+			r###"
+			SELECT "Layers".*
+			FROM "BacktracesLayers" 
+			JOIN "Backtraces" ON backtrace_id="Backtraces".id 
+			JOIN "Layers" 		ON layer_id="Layers".id 
+			WHERE backtrace_id = $1
+			"###,
+			log_record.backtrace_id
+		)
+		.fetch_all(&pool)
+		.await?;
+
+		for trace in trace_records {
+			traces.push(Layer {
+				line_number: trace.line_number,
+				column_number: trace.column_number,
+				code: trace.code,
+				name: trace.name,
+				file_path: Some(trace.file_path),
+			});
+		}
+
+		let log = Log {
+			id: log_record.id,
+			message: log_record.message.clone(),
+			language: log_record.language.clone(),
+			snippet: serde_json::from_value(log_record.snippet.clone())?,
+			backtrace: Trace { layers: traces },
+			warnings: log_record.warnings.clone(),
+			date: log_record.date.and_utc(),
+			received_from: log_record.received_from,
+			message_type: log_record.message_type,
+			line_number: log_record.line_number,
+			file_name: log_record.file_name,
+		};
+
+		logs.push(log);
+	}
+
+	Ok(Json(logs))
+}
+
+async fn list_server_logs(pool: PgPool) -> Result<Json<Vec<Log>>> {
+	let mut log_records = sqlx::query!(r#"SELECT * FROM "Logs""#)
 		.fetch_all(&pool)
 		.await?;
 
 	let mut logs = vec![];
 
 	for log in &mut log_records {
-		let snippet_record = sqlx::query!(
-			r#"SELECT line, code, file FROM snippets WHERE id = $1"#,
-			log.snippet_id
-		)
-		.fetch_one(&pool)
-		.await?;
-
 		let mut traces = vec![];
 		let trace_records = sqlx::query!(
 			r###"
-			SELECT line, code, file
-			FROM backtrace_snippet 
-			JOIN backtraces ON backtrace_id=backtraces.id 
-			JOIN snippets 	ON snippet_id=snippets.id 
+			SELECT "Layers".*
+			FROM "BacktracesLayers" 
+			JOIN "Backtraces" ON backtrace_id="Backtraces".id 
+			JOIN "Layers" 		ON layer_id="Layers".id 
 			WHERE backtrace_id = $1
 			"###,
 			log.backtrace_id
@@ -102,32 +164,55 @@ pub async fn list_logs(Extension(pool): Extension<PgPool>) -> Result<Json<Vec<Lo
 		.await?;
 
 		for trace in trace_records {
-			traces.push(Layer(Snippet {
-				line: trace.line,
+			traces.push(Layer {
+				line_number: trace.line_number,
+				column_number: trace.column_number,
 				code: trace.code,
-				file: trace.file,
-			}));
+				name: trace.name,
+				file_path: Some(trace.file_path),
+			});
 		}
 
 		let log = Log {
 			id: log.id,
 			message: log.message.clone(),
 			language: log.language.clone(),
-			snippet: Snippet {
-				line: snippet_record.line,
-				code: snippet_record.code,
-				file: snippet_record.file,
-			},
+			snippet: serde_json::from_value(log.snippet.clone())?,
 			backtrace: Trace { layers: traces },
 			warnings: log.warnings.clone(),
 			date: log.date.and_utc(),
 			received_from: log.received_from,
+			message_type: log.message_type.clone(),
+			line_number: log.line_number,
+			file_name: log.file_name.clone(),
 		};
 
 		logs.push(log);
 	}
 
 	Ok(Json(logs))
+}
+
+#[utoipa::path(
+	get,
+	path="/api/logs",
+	responses(
+		(status=200, description="List all the logs received by the server, or logs sent to the given `client-id` if present.", body=[Log])
+	),
+	params(
+		("client-id" = Option<i32>, Header, description = "Client ID (optional)"),
+	),
+)]
+#[axum_macros::debug_handler]
+pub async fn list_logs(
+	client_id: Option<ClientId>,
+	Extension(pool): Extension<PgPool>,
+) -> Result<Json<Vec<Log>>> {
+	if let Some(client_id) = client_id {
+		list_logs_for_user(pool, client_id).await
+	} else {
+		list_server_logs(pool).await
+	}
 }
 
 #[utoipa::path(
@@ -138,9 +223,13 @@ pub async fn list_logs(Extension(pool): Extension<PgPool>) -> Result<Json<Vec<Lo
 		(status=200, description="Log was created"),
 		(status=500, description="An internal server error occurred")
 	),
+	params(
+		("client-id" = i32, Header, description = "Client ID"),
+	),
 )]
 #[axum_macros::debug_handler]
 pub async fn add_log(
+	ClientId(client_id): ClientId,
 	Extension(pool): Extension<PgPool>,
 	State(store): State<Store>,
 	ConnectInfo(addr): ConnectInfo<SocketAddr>,
@@ -159,51 +248,33 @@ pub async fn add_log(
 
 	if let Err(err) = store.sender.send(log.clone()) {
 		tracing::error!("Could not send log to back-end: {err}");
+	} else {
+		tracing::info!("Sent log to backend");
 	}
 
-	let snippet_id = sqlx::query!(
-		r#"INSERT INTO snippets (line, code) VALUES ($1, $2) RETURNING id"#,
-		log.snippet.line,
-		log.snippet.code.clone()
-	)
-	.fetch_one(&pool)
-	.await?
-	.id;
-
 	let backtrace_id =
-		sqlx::query!(r#"INSERT INTO backtraces DEFAULT VALUES RETURNING id"#)
+		sqlx::query!(r#"INSERT INTO "Backtraces" DEFAULT VALUES RETURNING id"#)
 			.fetch_one(&pool)
 			.await?
 			.id;
-
-	let rows_changed = sqlx::query!(
-		r###"
-		INSERT INTO backtrace_snippet (backtrace_id, snippet_id)
-		VALUES ($1, $2)
-		"###,
-		backtrace_id,
-		snippet_id
-	)
-	.execute(&pool)
-	.await?
-	.rows_affected();
-
-	if rows_changed == 0 {
-		tracing::error!(
-			"Could not insert snippet {snippet_id} for backtrace {backtrace_id}."
-		);
-	}
 
 	let layer_results = log
 		.backtrace
 		.layers
 		.iter()
-		.filter(|layer| log.snippet.line != layer.line && log.snippet.code != layer.code)
+		.filter(|layer| log.line_number != layer.line_number)
 		.map(|layer| {
 			sqlx::query!(
-				r#"INSERT INTO snippets (line, code) VALUES ($1, $2) RETURNING id"#,
-				layer.line,
-				layer.code.clone()
+				r###"
+				INSERT INTO "Layers" (line_number, column_number, code, name, file_path) 
+				VALUES ($1, $2, $3, $4, $5) 
+				RETURNING id
+				"###,
+				layer.line_number,
+				layer.column_number,
+				layer.code.clone(),
+				layer.name.clone(),
+				layer.file_path.clone(),
 			)
 			.fetch_one(&pool)
 		});
@@ -213,7 +284,7 @@ pub async fn add_log(
 
 		sqlx::query!(
 			r###"
-			INSERT INTO backtrace_snippet (backtrace_id, snippet_id) 
+			INSERT INTO "BacktracesLayers" (backtrace_id, layer_id) 
 			VALUES ($1, $2)
 			"###,
 			backtrace_id,
@@ -225,22 +296,48 @@ pub async fn add_log(
 
 	let log_id = sqlx::query!(
 		r###"
-		INSERT INTO logs (id, message, language, snippet_id, backtrace_id, warnings, date, received_from) 
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
+		INSERT INTO "Logs" (
+			client_id,
+			message, 
+			message_type,
+			language, 
+			snippet, 
+			line_number,
+			backtrace_id, 
+			warnings, 
+			date,
+			file_name,
+			received_from
+		) 
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) 
 		RETURNING id
 		"###,
-		log.id,
+		client_id,
 		log.message.clone(),
+		log.message_type.clone(),
 		log.language.clone(),
-		snippet_id,
+		serde_json::to_value(&log.snippet)?,
+		log.line_number,
 		backtrace_id,
 		&log.warnings.clone(),
 		log.date.naive_utc(),
+		log.file_name.clone(),
 		ip_network,
 	)
 	.fetch_one(&pool)
 	.await?
 	.id;
+
+	sqlx::query!(
+		r###"
+			UPDATE "Clients"
+			SET last_connected = now(), logs_sent = logs_sent + 1
+			WHERE id = $1
+		"###,
+		client_id
+	)
+	.execute(&pool)
+	.await?;
 
 	Ok(Json(Response {
 		message: fmt!("Log was created with ID {log_id}"),
@@ -256,32 +353,27 @@ pub async fn add_log(
 		(status=404, description="The log with the given `id` was not found"),
 	),
 	params(
+		("client-id" = i32, Header, description = "Client ID"),
 		("id" = Uuid, Path, description = "Log ID")
 	),
 )]
 #[axum_macros::debug_handler]
 pub async fn get_log(
+	ClientId(_client_id): ClientId,
 	Extension(pool): Extension<PgPool>,
 	Path(id): Path<Uuid>,
 ) -> Result<Json<Log>> {
-	let log_record = sqlx::query!(r#"SELECT * FROM logs WHERE id = $1"#, id)
+	let log_record = sqlx::query!(r#"SELECT * FROM "Logs" WHERE id = $1"#, id)
 		.fetch_one(&pool)
 		.await?;
-
-	let snippet_record = sqlx::query!(
-		r#"SELECT line, code, file FROM snippets WHERE id = $1"#,
-		log_record.snippet_id
-	)
-	.fetch_one(&pool)
-	.await?;
 
 	let mut layers = vec![];
 	let trace_records = sqlx::query!(
 		r###"
-			SELECT line, code, file
-			FROM backtrace_snippet 
-			JOIN backtraces ON backtrace_id=backtraces.id 
-			JOIN snippets 	ON snippet_id=snippets.id 
+			SELECT "Layers".*
+			FROM "BacktracesLayers" 
+			JOIN "Backtraces" ON backtrace_id="Backtraces".id 
+			JOIN "Layers" 		ON layer_id="Layers".id 
 			WHERE backtrace_id = $1
 			"###,
 		log_record.backtrace_id
@@ -290,25 +382,26 @@ pub async fn get_log(
 	.await?;
 
 	for trace in trace_records {
-		layers.push(Layer(Snippet {
-			line: trace.line,
+		layers.push(Layer {
+			line_number: trace.line_number,
+			column_number: trace.column_number,
 			code: trace.code,
-			file: trace.file,
-		}));
+			name: trace.name,
+			file_path: Some(trace.file_path),
+		});
 	}
 
 	Ok(Json(Log {
 		id: log_record.id,
 		message: log_record.message.clone(),
+		message_type: log_record.message_type.clone(),
 		language: log_record.language.clone(),
-		snippet: Snippet {
-			line: snippet_record.line,
-			code: snippet_record.code,
-			file: snippet_record.file,
-		},
+		snippet: serde_json::from_value(log_record.snippet.clone())?,
+		line_number: log_record.line_number,
 		backtrace: Trace { layers },
 		warnings: log_record.warnings.clone(),
 		date: log_record.date.and_utc(),
 		received_from: log_record.received_from,
+		file_name: log_record.file_name,
 	}))
 }

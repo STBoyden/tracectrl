@@ -3,7 +3,8 @@
 	clippy::module_name_repetitions,
 	clippy::enum_variant_names,
 	clippy::cast_possible_truncation,
-	clippy::cast_possible_wrap
+	clippy::cast_possible_wrap,
+	clippy::too_many_lines
 )]
 
 mod api;
@@ -229,6 +230,7 @@ async fn main() {
 	let peers = PeerMap::new();
 	while let Ok((raw_stream, addr)) = ws_socket.accept().await {
 		let rx = tx.subscribe();
+		
 		tokio::spawn(ws::handle_connection(peers.clone(), raw_stream, addr, rx));
 	}
 }

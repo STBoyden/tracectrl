@@ -3,7 +3,7 @@ use std::{net::SocketAddr, time::Duration};
 use crate::utils::{log_socket::LogReceiver, peer_map::PeerMap};
 
 use futures_channel::mpsc::unbounded;
-use futures_util::{SinkExt, StreamExt};
+use futures_util::{future, SinkExt, StreamExt, TryStreamExt};
 use tokio::net::TcpStream;
 
 pub async fn handle_connection(
@@ -37,7 +37,11 @@ pub async fn handle_connection(
 
 		let (mut outgoing, _incoming) = stream.split();
 
-		// let _receive_ids = incoming.try_for_each(|_| future::ok(()));
+		// let _receive_ids = incoming.try_for_each(|message| {
+		// 	// id.
+
+		// 	future::ok(())
+		// });
 
 		while let Ok(log) = log_receiver.recv().await {
 			tracing::debug!("Received log, sending to {addr}");
