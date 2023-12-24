@@ -126,7 +126,9 @@ export function LogsArea() {
 										</AccordionContent>
 									</AccordionItem>
 									<AccordionItem value="warnings">
-										<AccordionTrigger>Warnings</AccordionTrigger>
+										<AccordionTrigger>
+											{log.warnings.length} warning(s)
+										</AccordionTrigger>
 										<AccordionContent>
 											{log.warnings.map((warning, index) => {
 												return (
@@ -157,7 +159,7 @@ export function LogsArea() {
 														fontWeight: "bold",
 														fontStyle: "italic",
 														textDecorationLine: "underline",
-												  }
+													}
 												: {}
 										) as React.CSSProperties;
 									}}
