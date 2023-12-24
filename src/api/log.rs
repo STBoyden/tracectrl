@@ -354,13 +354,29 @@ pub async fn add_log(
 )]
 #[axum_macros::debug_handler]
 pub async fn get_log(
-	ClientId(_client_id): ClientId,
+	ClientId(client_id): ClientId,
 	Extension(pool): Extension<PgPool>,
 	Path(id): Path<Uuid>,
 ) -> Result<Json<Log>> {
-	let log_record = sqlx::query!(r#"SELECT * FROM "Logs" WHERE id = $1"#, id)
-		.fetch_one(&pool)
-		.await?;
+	let log_record = sqlx::query!(
+		r###"
+			SELECT * FROM "Logs" 
+			WHERE id = $1 AND backtrace_id = $2
+	"###,
+		id,
+		client_id
+	)
+	.fetch_optional(&pool)
+	.await?;
+
+	if log_record.is_none() {
+		return Err(Error::ResponseError(
+			StatusCode::NOT_FOUND,
+			format!("Log with ID {id} not found for client ID {client_id}"),
+		));
+	}
+
+	let log_record = log_record.unwrap();
 
 	let mut layers = vec![];
 	let trace_records = sqlx::query!(
