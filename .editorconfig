@@ -1,5 +1,6 @@
-[*.{rs,ts,tsx,js,jsx}]
+[*.{rs,ts,tsx,js,jsx,sh,ps1}]
 tab_width = 2
 charset = utf-8
 indent_size = 2
 indent_style = tab
+end_of_line = lf
