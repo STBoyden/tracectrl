@@ -6,7 +6,7 @@
 
 The project is made up of the Rust backend located in the root of the project, and the front-end available in [tc-frontend](https://github.com/STBoyden/tracectrl/tree/main/tc-frontend).
 
-The backend is a Axum REST server, that exposes API endpoints to add and get logs - differently from how CodeCTRL did it with gRPC. When the backend is ran, documentation for the API is generated and viewable at `/docs/swagger` and `/docs/redoc`. Additionally, the OpenAPI JSON can be made locally by running the backend with the `save_docs` feature enabled (enabled by default) - which will output a file called `openapi.json` to the root of the project. This can be used to generate client/server bindings to the API automatically using a tool such as <https://editor.swagger.io>.
+The backend is an Axum REST server, that exposes API endpoints to add and get logs - differently from how CodeCTRL did it with gRPC. When the backend is ran, documentation for the API is generated and viewable at `/docs/swagger` and `/docs/redoc`. Additionally, the OpenAPI JSON can be made locally by running the backend with the `save_docs` feature enabled (enabled by default) - which will output a file called `openapi.json` to the root of the project. This can be used to generate client/server bindings to the API automatically using a tool such as <https://editor.swagger.io>.
 
 ## Requirements
 
