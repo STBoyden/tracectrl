@@ -258,26 +258,21 @@ pub async fn add_log(
 			.await?
 			.id;
 
-	let layer_results = log
-		.backtrace
-		.layers
-		.iter()
-		.filter(|layer| log.line_number != layer.line_number)
-		.map(|layer| {
-			sqlx::query!(
-				r###"
+	let layer_results = log.backtrace.layers.iter().map(|layer| {
+		sqlx::query!(
+			r###"
 				INSERT INTO "Layers" (line_number, column_number, code, name, file_path) 
 				VALUES ($1, $2, $3, $4, $5) 
 				RETURNING id
 				"###,
-				layer.line_number,
-				layer.column_number,
-				layer.code.clone(),
-				layer.name.clone(),
-				layer.file_path.clone(),
-			)
-			.fetch_one(&pool)
-		});
+			layer.line_number,
+			layer.column_number,
+			layer.code.clone(),
+			layer.name.clone(),
+			layer.file_path.clone(),
+		)
+		.fetch_one(&pool)
+	});
 
 	for future in layer_results {
 		let layer = future.await?;
