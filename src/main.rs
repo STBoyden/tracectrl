@@ -230,7 +230,7 @@ async fn main() {
 	let peers = PeerMap::new();
 	while let Ok((raw_stream, addr)) = ws_socket.accept().await {
 		let rx = tx.subscribe();
-		
+
 		tokio::spawn(ws::handle_connection(peers.clone(), raw_stream, addr, rx));
 	}
 }
