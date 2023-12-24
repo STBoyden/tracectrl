@@ -21,7 +21,7 @@ import dayjs from "dayjs";
 export function HeaderBar() {
 	const [open, setOpen] = useState(false);
 	const [search, setSearch] = useState("");
-	const { logs } = useLogs();
+	const { client: logs } = useLogs();
 
 	useEffect(() => {
 		const down = (e: KeyboardEvent) => {

@@ -1,18 +1,23 @@
 import { v4 as uuidv4 } from "uuid";
 
 type Layer = {
-	line: number;
 	code: string;
-	file: string;
+	column_number: number;
+	file_path: string;
+	line_number: number;
+	name: string;
 };
 
 export type Log = {
 	id: typeof uuidv4;
-	message: string;
-	language: string;
-	snippet: Layer;
 	backtrace: { layers: Array<Layer> };
-	warnings: Array<string>;
-	received_from: string;
 	date: Date;
+	file_name: string;
+	language: string;
+	line_number: number;
+	message: string;
+	messsage_type: string;
+	received_from: string;
+	snippet: { [key: number]: string };
+	warnings: Array<string>;
 };

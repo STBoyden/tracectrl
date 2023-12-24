@@ -27,7 +27,7 @@ import {
 	_defaultSettings,
 	settingsFormSchema,
 	useSettings,
-} from "../settings-provider";
+} from "@/components/settings-provider";
 
 export function HeaderBarMenu() {
 	const { toast } = useToast();
@@ -81,7 +81,7 @@ export function HeaderBarMenu() {
 									</FormControl>
 									<FormDescription>
 										The host from where to receive the logs via websockets from.
-										By default, it is targeted at
+										By default, it is targeted at{" "}
 										<span className={cn("font-mono")}>
 											{_defaultSettings.websocketHost!}
 										</span>
@@ -90,7 +90,7 @@ export function HeaderBarMenu() {
 									<FormMessage />
 								</FormItem>
 							)}
-						></FormField>
+						/>
 						<Button type="submit">Save changes</Button>
 					</form>
 				</Form>

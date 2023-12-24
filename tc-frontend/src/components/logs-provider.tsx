@@ -6,27 +6,27 @@ import useWebSocket from "react-use-websocket";
 
 const logsKey = "tracectrl-logs" as const;
 
-type Logs = {
+type ClientSettings = {
 	logs: Array<Log>;
+	clientId?: number;
 };
 
-const _default: Logs = {
+const _default: ClientSettings = {
 	logs: [],
+	clientId: undefined,
 };
 
 type LogsProviderProps = {
 	children: React.ReactNode;
-	defaultSettings?: Logs;
+	defaultSettings?: ClientSettings;
 };
 
 type LogsProviderState = {
-	logs: Logs;
-	addLog: (log: Log) => void;
+	client: ClientSettings;
 };
 
 const initialState: LogsProviderState = {
-	logs: _default,
-	addLog: () => null,
+	client: _default,
 };
 
 const LogsProviderContext = createContext<LogsProviderState>(initialState);
@@ -37,36 +37,76 @@ export function LogsProvider({
 	...props
 }: LogsProviderProps) {
 	const { settings } = useSettings();
-	const [logs, setLogs] = useState<Logs>(
+	const [clientSettings, setLogs] = useState<ClientSettings>(
 		() =>
 			(JSON.parse(
 				localStorage.getItem(logsKey) ?? JSON.stringify(""),
-			) as Logs) || defaultSettings,
+			) as ClientSettings) || defaultSettings,
 	);
+
+	const { logs, clientId } = clientSettings;
 
 	useWebSocket(`ws://${settings.websocketHost}`, {
 		reconnectAttempts: 5,
-		onOpen: () => console.log("connection established"),
+		onOpen: () => {
+			console.log("connection established");
+
+			if (clientId) {
+				fetch(`/api/logs`, {
+					method: "GET",
+					headers: {
+						"client-id": `${clientId}`,
+					},
+				}).then(async (res) => {
+					try {
+						const json = await res.json();
+						console.log(json);
+						const response = json as Array<Log>;
+						const _new = { logs: response, clientId: clientId };
+
+						setLogs(_new);
+						localStorage.setItem(logsKey, JSON.stringify(_new));
+					} catch (error) {
+						console.error(`could not convert response: ${error}`);
+					}
+				});
+
+				return;
+			}
+
+			type Response = {
+				client_id: number;
+			};
+
+			fetch(`/api/get_or_register_client`, { method: "post" }).then(
+				async (res) => {
+					try {
+						const response = (await res.json()) as Response;
+						const _new = { logs: logs, clientId: response.client_id };
+						setLogs(_new);
+						localStorage.setItem(logsKey, JSON.stringify(_new));
+					} catch (error) {
+						console.error(`could not convert response: ${error}`);
+					}
+				},
+			);
+		},
 		onMessage: (event) => {
 			const log = JSON.parse(event.data) as Log;
 
 			if (log) {
 				console.log(`log recieved: ${log.id}`);
-				setLogs({ logs: [...logs.logs, log] });
-				localStorage.setItem(logsKey, JSON.stringify(logs));
+
+				const _new = { logs: [...logs, log], clientId };
+				setLogs(_new);
+				localStorage.setItem(logsKey, JSON.stringify(_new));
 			}
 		},
 		shouldReconnect: () => true,
 	});
 
 	const value = {
-		logs: logs,
-		addLog: (log: Log) => {
-			const newLogs = { logs: [...logs.logs, log] };
-
-			setLogs(newLogs);
-			localStorage.setItem(logsKey, JSON.stringify(newLogs));
-		},
+		client: clientSettings,
 	};
 
 	return (

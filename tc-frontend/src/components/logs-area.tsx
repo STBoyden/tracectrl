@@ -30,7 +30,7 @@ import {
 	AccordionTrigger,
 } from "@/components/ui/accordion";
 
-const columns = [
+const columns: Array<{ accessorKey: string; header: string }> = [
 	{ accessorKey: "index", header: "Index" },
 	{ accessorKey: "warnings", header: "Warnings" },
 	{ accessorKey: "message", header: "Message" },
@@ -41,10 +41,10 @@ const columns = [
 ];
 
 export function LogsArea() {
-	const { logs } = useLogs();
+	const { client } = useLogs();
 	const { variant } = useTheme();
 
-	const _logs = logs.logs.map((log, index) => {
+	const _logs = client.logs.map((log, index) => {
 		return {
 			index: index,
 			...log,
@@ -55,7 +55,7 @@ export function LogsArea() {
 						<HoverCardContent className="w-[400px]">
 							{log.warnings.map((warning, index) => {
 								return (
-									<p>
+									<p key={`${log.id}-warnings`}>
 										<span className="font-mono">{index + 1}:</span> {warning}
 									</p>
 								);
@@ -77,7 +77,7 @@ export function LogsArea() {
 							<SheetDescription className="font-mono">
 								<p>
 									<span className="font-sans">Position: </span>
-									{log.snippet.file}:{log.snippet.line}
+									{log.file_name}:{log.line_number}
 								</p>
 								<p>
 									<span className="font-sans">Message: </span> {log.message}
@@ -102,7 +102,7 @@ export function LogsArea() {
 										<AccordionContent className="pl-4">
 											<Accordion type="multiple" className="w-full">
 												{log.backtrace.layers.map(
-													({ line, code, file }, index) => {
+													({ line_number, code, file_path }, index) => {
 														return (
 															<AccordionItem value={`layer-${index}`}>
 																<AccordionTrigger>
@@ -111,7 +111,7 @@ export function LogsArea() {
 																<AccordionContent className="font-mono pl-4">
 																	<p>
 																		<span className="font-sans">File: </span>
-																		{file}:{line}
+																		{file_path}:{line_number}
 																	</p>
 																	<p>
 																		<span className="font-sans">Code: </span>
@@ -130,7 +130,10 @@ export function LogsArea() {
 										<AccordionContent>
 											{log.warnings.map((warning, index) => {
 												return (
-													<div className="font-mono">
+													<div
+														key={`${log.id}-warning-${index}`}
+														className="font-mono"
+													>
 														<p>
 															<span className="font-sans">{index + 1}: </span>
 															{warning}
@@ -144,16 +147,16 @@ export function LogsArea() {
 							</div>
 							<div className="w-full resize-y border-l pl-2">
 								<SyntaxHighlighter
-									children={log.snippet.code}
+									children={Object.values(log.snippet).join("\n")}
 									language={log.language.toLowerCase()}
 									style={variant == "dark" ? a11yDark : a11yLight}
 									lineNumberStyle={(line) => {
 										return (
-											line == log.snippet.line
+											line == log.line_number
 												? {
-														"font-weight": "bold",
-														"font-style": "italic",
-														"text-decoration-line": "underline",
+														fontWeight: "bold",
+														fontStyle: "italic",
+														textDecorationLine: "underline",
 												  }
 												: {}
 										) as React.CSSProperties;
