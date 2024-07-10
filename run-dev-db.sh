@@ -5,6 +5,11 @@ ADMINER_CONTAINER_NAME="${CONTAINER_NAME}-adminer"
 DB_USER="tracectrl"
 DB_NAME="tracectrl"
 
+if [ ! $(id -u) -eq 0 ]; then
+    echo "This script needs to be ran as root"
+    exit 1
+fi
+
 if [ ! "$(command -v docker)" ]; then
 	echo "command \"docker\" doesn't exist on system"
 	exit 1
